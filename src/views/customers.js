@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useHistory } from "react-router-dom";
+
 import { makeStyles } from "@material-ui/core/styles";
 import List from "@material-ui/core/List";
 import ListItem from "@material-ui/core/ListItem";
@@ -7,19 +9,23 @@ import ListItemSecondaryAction from "@material-ui/core/ListItemSecondaryAction";
 import ListItemAvatar from "@material-ui/core/ListItemAvatar";
 import Avatar from "@material-ui/core/Avatar";
 import IconButton from "@material-ui/core/IconButton";
-import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
-import CallMade from "@material-ui/icons/CallMade";
-import CallReceived from "@material-ui/icons/CallReceived";
 import Box from "@material-ui/core/Box";
+import {
+  deepOrange,
+  deepPurple,
+  pink,
+  indigo,
+  blue,
+  teal,
+} from "@material-ui/core/colors";
+import InfoOutlinedIcon from "@material-ui/icons/InfoOutlined";
 import Skeleton from "@material-ui/lab/Skeleton/Skeleton";
 import Dialog from "@material-ui/core/Dialog";
 import DialogContent from "@material-ui/core/DialogContent";
 import DialogTitle from "@material-ui/core/DialogTitle";
-import InfiniteScroll from "react-infinite-scroll-component";
 
+import InfiniteScroll from "react-infinite-scroll-component";
 import axios from "axios";
-import moment from "moment";
-import humanizeDuration from "humanize-duration";
 
 const useStyles = makeStyles((theme) => ({
   root: {
@@ -28,37 +34,59 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export default function HistoryCalls(props) {
-  const customer_id = props.match.params.id;
+export default function Customers() {
+  const history = useHistory();
   const classes = useStyles();
   const [items, setItems] = useState([]);
   const [next, setNext] = useState("");
   const [isLoading, setLoading] = useState(false);
-  const [customer, setCustomer] = useState({
-    name: "",
-  });
+  let countColour = 0;
+  const colours = {
+    orange: {
+      color: "#fff",
+      backgroundColor: deepOrange[500],
+    },
+    purple: {
+      color: "#fff",
+      backgroundColor: deepPurple[500],
+    },
+    pink: {
+      color: "#fff",
+      backgroundColor: pink[500],
+    },
+    indigo: {
+      color: "#fff",
+      backgroundColor: indigo[500],
+    },
+    blue: {
+      color: "#fff",
+      backgroundColor: blue[500],
+    },
+    teal: {
+      color: "#fff",
+      backgroundColor: teal[500],
+    },
+  };
   const [open, setOpen] = useState(false);
   const defaultSelected = {
-    incoming: {
-      name: "",
-      phone: "",
+    name: "",
+    total_duration: {
+      sum: "",
+      count: "",
     },
-    outgoing: {
-      name: "",
-      phone: "",
+    total_incoming: {
+      sum: "",
+      count: "",
     },
-    type_call: "",
-    duration: "",
+    total_outgoing: {
+      sum: "",
+      count: "",
+    },
   };
   const [selected, setSelected] = useState(defaultSelected);
 
   const handleClickOpen = (item) => {
     setOpen(true);
-    if (item.type_call === "outgoing") {
-      item.outgoing = defaultSelected.outgoing;
-    } else {
-      item.incoming = defaultSelected.incoming;
-    }
     setSelected(item);
   };
 
@@ -67,28 +95,18 @@ export default function HistoryCalls(props) {
     setSelected(defaultSelected);
   };
 
-  const fetchHistory = (id) => {
+  const fetchCustomers = () => {
     setLoading(true);
     axios
-      .get(`http://localhost:8000/api/v1/customers/${id}/history`)
+      .get(`http://localhost:8000/api/v1/customers`)
       .then((res) => {
-        setItems(res.data.results);
+        setItems(
+          res.data.results.map((item) => {
+            item.avatar_colour = getAvatarColour();
+            return item;
+          })
+        );
         setNext(res.data.next);
-      })
-      .catch((errors) => {
-        console.log(errors);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  };
-
-  const fetchCustomer = (id) => {
-    setLoading(true);
-    axios
-      .get(`http://localhost:8000/api/v1/customers/${id}`)
-      .then((res) => {
-        setCustomer(res.data);
       })
       .catch((errors) => {
         console.log(errors);
@@ -102,7 +120,14 @@ export default function HistoryCalls(props) {
     axios
       .get(next)
       .then((res) => {
-        setItems(items.concat(res.data.results));
+        setItems(
+          items.concat(
+            res.data.results.map((item) => {
+              item.avatar_colour = getAvatarColour();
+              return item;
+            })
+          )
+        );
         setNext(res.data.next);
       })
       .catch((errors) => {
@@ -113,13 +138,30 @@ export default function HistoryCalls(props) {
       });
   };
 
-  const parseDate = (date) => {
-    return moment(date).fromNow();
+  const initialCustomerName = (name) => {
+    if (!name.length) return "";
+    const names = name.split(" ");
+    let result = names[0].charAt(0).toUpperCase();
+    if (names.length > 1) {
+      let lastChar = names[1].charAt(0).toUpperCase();
+      result = `${result}${lastChar}`;
+    }
+    return result;
+  };
+
+  const getAvatarColour = () => {
+    const arrColours = Object.keys(colours);
+    const result = arrColours[countColour];
+    if (countColour >= 5) {
+      countColour = 0;
+    } else {
+      countColour += 1;
+    }
+    return result;
   };
 
   useEffect(() => {
-    fetchHistory(customer_id);
-    fetchCustomer(customer_id);
+    fetchCustomers();
   }, []);
 
   return (
@@ -130,59 +172,44 @@ export default function HistoryCalls(props) {
         aria-labelledby="form-dialog-title"
         maxWidth="lg"
       >
-        <DialogTitle id="form-dialog-title">Detail History</DialogTitle>
+        <DialogTitle id="form-dialog-title">Customer Info</DialogTitle>
         <DialogContent style={{ width: "500px" }}>
           <Box display="flex">
             <Box marginRight="20px">
-              <Avatar></Avatar>
+              <Avatar style={colours[selected.avatar_colour]}>
+                {initialCustomerName(selected.name)}
+              </Avatar>
             </Box>
             <Box>
               <Box fontWeight="bold" fontSize="17px">
-                {selected.type_call === "outgoing"
-                  ? selected.incoming.name
-                  : selected.outgoing.name}
+                {selected.name}
               </Box>
-              <Box>
-                {selected.type_call === "outgoing"
-                  ? selected.incoming.phone
-                  : selected.outgoing.phone}
-              </Box>
+              <Box>{selected.phone}</Box>
             </Box>
           </Box>
           <Box marginTop="20px">
-            <Box
-              fontWeight="bold"
-              fontSize="15px"
-              display="flex"
-              alignItems="center"
-            >
-              <CallReceived
-                style={{
-                  fontSize: "15px",
-                  marginRight: "10px",
-                }}
-              />
-              {selected.type_call === "outgoing"
-                ? "Outgoing call"
-                : "Incoming call"}
+            <Box fontWeight="bold" fontSize="15px">
+              Incoming
             </Box>
-            <Box>{humanizeDuration(selected.duration * 1000)}</Box>
+            <Box>{selected.total_incoming.count}x times</Box>
+            <Box>durations: {selected.total_incoming.sum}s</Box>
           </Box>
           <Box marginTop="15px">
             <Box fontWeight="bold" fontSize="15px">
-              Date
+              Outgoing
             </Box>
-            <Box>{selected.dialed_on}</Box>
+            <Box>{selected.total_outgoing.count}x times</Box>
+            <Box>durations: {selected.total_outgoing.sum}s</Box>
+          </Box>
+          <Box marginTop="15px">
+            <Box fontWeight="bold" fontSize="15px">
+              Total
+            </Box>
+            <Box>{selected.total_duration.count}x times</Box>
+            <Box>durations: {selected.total_duration.sum}s</Box>
           </Box>
         </DialogContent>
       </Dialog>
-      {!customer.name.length ? (
-        <Skeleton height={50} width={300} style={{ marginBottom: "20px" }} />
-      ) : (
-        <Box fontWeight="bold" fontSize="25px" marginBottom="20px">
-          {customer.name}'s history
-        </Box>
-      )}
       {isLoading ? (
         <div>
           <Skeleton height={80} style={{ transform: "scale(1, 0.9)" }} />
@@ -207,27 +234,17 @@ export default function HistoryCalls(props) {
             }
           >
             {items.map((item, index) => (
-              <ListItem key={index}>
+              <ListItem
+                button
+                key={index}
+                onClick={() => history.push(`/customers/${item.id}/history`)}
+              >
                 <ListItemAvatar>
-                  <Avatar>
-                    {item.type_call === "outgoing" ? (
-                      <CallMade />
-                    ) : (
-                      <CallReceived />
-                    )}
+                  <Avatar style={colours[item.avatar_colour]}>
+                    {initialCustomerName(item.name)}
                   </Avatar>
                 </ListItemAvatar>
-                {item.type_call === "outgoing" ? (
-                  <ListItemText
-                    primary={item.incoming.name}
-                    secondary="Outgoing"
-                  />
-                ) : (
-                  <ListItemText
-                    primary={item.outgoing.name}
-                    secondary="Incoming"
-                  />
-                )}
+                <ListItemText primary={item.name} secondary={item.phone} />
                 <ListItemSecondaryAction
                   style={{
                     color: "rgba(0, 0, 0, 0.54)",
@@ -235,10 +252,7 @@ export default function HistoryCalls(props) {
                     alignItems: "center",
                   }}
                 >
-                  <div style={{ textAlign: "right" }}>
-                    <div>{parseDate(item.dialed_on)}</div>
-                    <div>{humanizeDuration(item.duration * 1000)}</div>
-                  </div>
+                  <div>Total duration: {item.total_duration.sum}s</div>
                   <IconButton
                     edge="end"
                     aria-label="info"
